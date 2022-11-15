@@ -1,4 +1,5 @@
 import mqtt from 'mqtt';
+
 class MqttCommander {
 
     host = 'localhost';
@@ -8,6 +9,7 @@ class MqttCommander {
     client = null;
     topics = [];
     saveToDatabase = false;
+    dbConnection = null;
 
     constructor() {
         this.connectUrl = `mqtt://${this.host}:${this.port}`;
@@ -18,8 +20,14 @@ class MqttCommander {
             connectTimeout: 4000,
             reconnectPeriod: 1000,
         })
+
         this.client.on('message', this.onMessage.bind(this));
         this.client.on('connect', this.onConnect.bind(this));
+    }
+
+    setDatabaseConnection(dbConnection){
+        this.dbConnection = dbConnection;
+        this.saveToDatabase = !!dbConnection;
     }
 
     onConnect(){
@@ -41,17 +49,30 @@ class MqttCommander {
         return string;
     }
 
-    onMessage(topic, payload){
-        console.log('Received MQTT Message:', topic, payload.toString())
+    async onMessage(topic, payload){
+        const date = new Date().toLocaleDateString();
+        console.log(date, 'Received MQTT Message:', topic, payload.toString())
         if(this.saveToDatabase){
-            const data = this.createDatabaseObject(payload);
-            /** Database Connection can be placed here may need to change as async function **/
+            const data = this.createDatabaseObject(topic, payload);
+            await this.dbConnection.storeSensorData(data);
         }
     }
 
-    createDatabaseObject(payload){
+    createDatabaseObject(topic, payload){
+        payload = JSON.parse(payload.toString());
+        const data = {
+            topic: topic,
+            sensorId: payload.sensorId,
+            temperature: payload.temperature,
+            humidity: payload.humidity,
+            created : new Date().toISOString().slice(0, 19).replace('T', ' ')
+        }
         /** Modify this function to fit your needs **/
-        return payload;
+        return data;
+    }
+
+    async saveMessage(topic, data){
+
     }
 
 }
